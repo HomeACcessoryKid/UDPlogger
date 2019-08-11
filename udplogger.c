@@ -22,7 +22,7 @@ int  udplogstring_len=0;
 int  members=0,oldtime=0;
 
 void udplog_send(void *pvParameters){
-    int lSocket,timeout,n,holdoff=200; //should represent 2 seconds after trigger
+    int lSocket,timeout=1,n,holdoff=200; //should represent 2 seconds after trigger
     unsigned int len;
     struct sockaddr_in sLocalAddr, sClntAddr;
     char buffer[2];

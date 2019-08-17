@@ -16,6 +16,7 @@
 #include <udplogger.h>
 
 SemaphoreHandle_t xUDPlogSemaphore = NULL;
+_WriteFunction    *old_stdout_write;
 //should make udplogstring dynamic
 char udplogstring[2900]={0}; //in the end I do not know to prevent overflow, so I use the max size of 2 UDP packets ??
 int  udplogstring_len=0;
@@ -61,7 +62,7 @@ void udplog_send(void *pvParameters){
             if ((sdk_system_get_time()/1000-oldtime)>timeout*1000) members=0;
             if( xSemaphoreTake( xUDPlogSemaphore, ( TickType_t ) 1 ) == pdTRUE ) {
                 if (members) lwip_sendto(lSocket, udplogstring, udplogstring_len, 0, (struct sockaddr *)&sClntAddr, sizeof(sClntAddr));
-                printf("%3d->%d @ %d\n",udplogstring_len,members,sdk_system_get_time()/1000);
+                UDPLSO("%3d->%d @ %d\n",udplogstring_len,members,sdk_system_get_time()/1000);
                 udplogstring_len=0;
                 xSemaphoreGive( xUDPlogSemaphore );
                 holdoff=10;
@@ -72,7 +73,26 @@ void udplog_send(void *pvParameters){
     }
 }
 
+#ifdef  UDPLOG_PRINTF_TO_UDP
+#pragma message "UDPLOG_PRINTF_TO_UDP activated"
+ static int new_stdout_write(struct _reent *r, int fd, const void *ptr, size_t len) {
+    #ifdef  UDPLOG_PRINTF_ALSO_SERIAL
+     old_stdout_write(NULL,0,ptr,len);
+    #endif  //ifdef UDPLOG_PRINTF_ALSO_SERIAL
+    if (xSemaphoreTake( xUDPlogSemaphore, ( TickType_t ) 1 ) == pdTRUE) {
+        memcpy(udplogstring+udplogstring_len,ptr,len); udplogstring_len+=len;
+        xSemaphoreGive( xUDPlogSemaphore );
+    } else UDPLSO("skipped a UDPLOG\n");
+    return len;
+ }
+#endif  //ifdef UDPLOG_PRINTF_TO_UDP
+
 void udplog_init(int prio) {
+    old_stdout_write=get_write_stdout();
+    #ifdef  UDPLOG_PRINTF_TO_UDP
+     set_write_stdout(new_stdout_write);
+    #endif  //ifdef UDPLOG_PRINTF_TO_UDP
+    
     xUDPlogSemaphore   = xSemaphoreCreateMutex();
     xTaskCreate(udplog_send, "logsend", 512, NULL, prio, NULL);
 }

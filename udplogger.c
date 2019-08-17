@@ -17,9 +17,10 @@
 
 SemaphoreHandle_t xUDPlogSemaphore = NULL;
 _WriteFunction    *old_stdout_write;
-//should make udplogstring dynamic
-char udplogstring[2900]={0}; //in the end I do not know to prevent overflow, so I use the max size of 2 UDP packets ??
+char udplogstring[UDPLOGSTRING_SIZE]={0};
 int  udplogstring_len=0;
+char *udplogsostring=NULL;
+size_t udplogsosize=0;
 int  members=0,oldtime=0;
 
 void udplog_send(void *pvParameters){

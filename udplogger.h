@@ -17,12 +17,18 @@
 #include <stdout_redirect.h>
 #include <semphr.h>
 
+#define UDPLOGSTRING_SIZE 1400
+
 #define UDPLUO(format, ...)  do {   if( xSemaphoreTake( xUDPlogSemaphore, ( TickType_t ) 1 ) == pdTRUE ) { \
                                         udplogstring_len+=sprintf(udplogstring+udplogstring_len,format,##__VA_ARGS__); \
                                         xSemaphoreGive( xUDPlogSemaphore ); \
                                     } else UDPLSO("skipped a UDPLOG\n"); \
                                 } while(0)
-#define UDPLSO(format, ...)  do {    \
+//TODO make string and size safe for re-entrant  maybe with CORE_LOCK
+#define UDPLSO(format, ...)  do {   udplogsostring=malloc(udplogsosize=1+snprintf(NULL,0,format,##__VA_ARGS__)); \
+                                    snprintf(udplogsostring,udplogsosize,format,##__VA_ARGS__); \
+                                    old_stdout_write(NULL,0,udplogsostring,udplogsosize); \
+                                    free(udplogsostring); \
                                 } while(0)
 #define UDPLUS(format, ...)  do {   UDPLSO(format,##__VA_ARGS__); \
                                     UDPLUO(format,##__VA_ARGS__); \
@@ -35,5 +41,7 @@ extern SemaphoreHandle_t xUDPlogSemaphore;
 extern _WriteFunction    *old_stdout_write;
 extern char udplogstring[];
 extern int  udplogstring_len;
+extern char *udplogsostring;
+extern size_t udplogsosize;
 
 #endif //__UDPLOGGER_H__

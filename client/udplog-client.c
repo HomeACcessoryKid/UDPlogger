@@ -11,7 +11,7 @@
 
 #define SPORT  45678
 #define PPORT  44444
-#define MAXLINE 2900
+#define MAXLINE 5000
 #define TO        29 //seconds
 
 static volatile sig_atomic_t keep_running=1;
@@ -85,6 +85,7 @@ int main(int argc, char* argv[]) {
         if (  timeout  ) {
             timeold=time(NULL);
             sendto(clntfd, (const char*)on, sizeof(on), 0, (struct sockaddr*)&peeraddr, sizeof(peeraddr));
+            sendto(clntfd, (const char*)on, sizeof(on), 0, (struct sockaddr*)&peeraddr, sizeof(peeraddr));
 //             printf("presence sent\n");
         }
         timeout=0;
@@ -109,6 +110,8 @@ int main(int argc, char* argv[]) {
             }
         }
     }
+    sendto(clntfd, (const char*)off, sizeof(off), 0, (struct sockaddr*)&peeraddr, sizeof(peeraddr));
+    sendto(clntfd, (const char*)off, sizeof(off), 0, (struct sockaddr*)&peeraddr, sizeof(peeraddr));
     sendto(clntfd, (const char*)off, sizeof(off), 0, (struct sockaddr*)&peeraddr, sizeof(peeraddr));
     printf("signed off\n");
 }

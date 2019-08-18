@@ -18,56 +18,57 @@
 SemaphoreHandle_t xUDPlogSemaphore = NULL;
 _WriteFunction    *old_stdout_write;
 char udplogstring[UDPLOGSTRING_SIZE]={0};
-int  udplogstring_len=0;
-int  members=0,oldtime=0;
+int  udplogmembers=0,udploglSocket,udplogstring_len=0;
+int  oldtime=0;
+struct sockaddr_in udplogsClntAddr;
 
 void udplog_send(void *pvParameters){
-    int lSocket,timeout=1,n,holdoff=200; //should represent 2 seconds after trigger
+    int timeout=1,n,holdoff=20*HOLDOFF; //should represent 2 seconds after trigger
     unsigned int len;
-    struct sockaddr_in sLocalAddr, sClntAddr;
+    struct sockaddr_in sLocalAddr;
     char buffer[2];
 
     while (sdk_wifi_station_get_connect_status() != STATION_GOT_IP) vTaskDelay(20); //Check if we have an IP every 200ms
 
-    lSocket = lwip_socket(AF_INET, SOCK_DGRAM, 0);
+    udploglSocket = lwip_socket(AF_INET, SOCK_DGRAM, 0);
     memset((char *)&sLocalAddr, 0, sizeof(sLocalAddr));
-    memset((char *)&sClntAddr,  0, sizeof(sClntAddr));
+    memset((char *)&udplogsClntAddr,  0, sizeof(udplogsClntAddr));
     /*Destination*/
-    sClntAddr.sin_family = AF_INET;
-    sClntAddr.sin_len = sizeof(sClntAddr);
-    sClntAddr.sin_addr.s_addr = htonl(INADDR_BROADCAST); // inet_addr("255.255.255.255");  or htonl(INADDR_BROADCAST);
-    sClntAddr.sin_port =htons(45678);
+    udplogsClntAddr.sin_family = AF_INET;
+    udplogsClntAddr.sin_len = sizeof(udplogsClntAddr);
+    udplogsClntAddr.sin_addr.s_addr = htonl(INADDR_BROADCAST); // inet_addr("255.255.255.255");  or htonl(INADDR_BROADCAST);
+    udplogsClntAddr.sin_port =htons(45678);
     /*Source*/
     sLocalAddr.sin_family = AF_INET;
     sLocalAddr.sin_len = sizeof(sLocalAddr);
     sLocalAddr.sin_addr.s_addr = htonl(INADDR_ANY);
     sLocalAddr.sin_port =htons(44444);
-    lwip_bind(lSocket, (struct sockaddr *)&sLocalAddr, sizeof(sLocalAddr));
+    lwip_bind(udploglSocket, (struct sockaddr *)&sLocalAddr, sizeof(sLocalAddr));
 
-    lwip_sendto(lSocket, INIT, strlen(INIT), 0, (struct sockaddr *)&sClntAddr, sizeof(sClntAddr));
+    lwip_sendto(udploglSocket, INIT, strlen(INIT), 0, (struct sockaddr *)&udplogsClntAddr, sizeof(udplogsClntAddr));
     fd_set rset;
     struct timeval tv = { 0, 10000 }; /* 10 millisecond cycle time for the while(1) loop */
     FD_ZERO(&rset); // clear the descriptor set
 
     while (1) {
-        FD_SET(lSocket,&rset);
-        select(lSocket+1, &rset, NULL, NULL, &tv); //is a delay of 10ms
-        if (FD_ISSET(lSocket, &rset)) {
-            len = sizeof(sClntAddr);
-            n = recvfrom(lSocket, (char *)buffer, 2, 0, ( struct sockaddr *) &sClntAddr, &len);
-            if (n==1) {members=1; holdoff=0; timeout=(int)buffer[0];oldtime=sdk_system_get_time()/1000;}
+        FD_SET(udploglSocket,&rset);
+        select(udploglSocket+1, &rset, NULL, NULL, &tv); //is a delay of 10ms
+        if (FD_ISSET(udploglSocket, &rset)) {
+            len = sizeof(udplogsClntAddr);
+            n = recvfrom(udploglSocket, (char *)buffer, 2, 0, ( struct sockaddr *) &udplogsClntAddr, &len);
+            if (n==1) {udplogmembers=1; holdoff=0; timeout=(int)buffer[0];oldtime=sdk_system_get_time()/1000;}
         }
-        if ((holdoff<=0 && udplogstring_len) || udplogstring_len>700) {
-            if ((sdk_system_get_time()/1000-oldtime)>timeout*1000) members=0;
+        if ((holdoff<=0 && udplogstring_len) || (holdoff<HOLDOFF && udplogstring_len>UDPLOGSTRING_SIZE*3/4)) {
+            if ((sdk_system_get_time()/1000-oldtime)>timeout*1000) udplogmembers=0;
             if( xSemaphoreTake( xUDPlogSemaphore, ( TickType_t ) 1 ) == pdTRUE ) {
-                if (members) lwip_sendto(lSocket, udplogstring, udplogstring_len, 0, (struct sockaddr *)&sClntAddr, sizeof(sClntAddr));
-                UDPLSO("%3d->%d @ %d\n",udplogstring_len,members,sdk_system_get_time()/1000);
+                if (udplogmembers) lwip_sendto(udploglSocket, udplogstring, udplogstring_len, 0, (struct sockaddr *)&udplogsClntAddr, sizeof(udplogsClntAddr));
+                UDPLSO("%3d->%d @ %d\n",udplogstring_len,udplogmembers,sdk_system_get_time()/1000);
                 udplogstring_len=0;
                 xSemaphoreGive( xUDPlogSemaphore );
-                holdoff=10;
+                holdoff=HOLDOFF;
             }
         }
-        if (holdoff<=0) holdoff=10; //sends output every 100ms if not more than 700 bytes
+        if (holdoff<=0) holdoff=HOLDOFF;
         holdoff--;
     }
 }
@@ -79,12 +80,22 @@ void udplog_send(void *pvParameters){
      old_stdout_write(NULL,0,ptr,len);
     #endif  //ifdef UDPLOG_PRINTF_ALSO_SERIAL
     if (xSemaphoreTake( xUDPlogSemaphore, ( TickType_t ) 1 ) == pdTRUE) {
-        memcpy(udplogstring+udplogstring_len,ptr,len); udplogstring_len+=len;
+        memcpy(udplogstring+udplogstring_len,ptr,len); udplogstring_len+=len; //TODO make dynamic
         xSemaphoreGive( xUDPlogSemaphore );
-    } else UDPLSO("skipped a UDPLOG\n");
+    } else UDPLSO("skipped a PRINTF_TO_UDP\n");
     return len;
  }
 #endif  //ifdef UDPLOG_PRINTF_TO_UDP
+
+void udplog_test(void *pvParameters){
+    int i=10;
+    while(1) {
+        vTaskDelay(200);
+        UDPLUO("%0*dA\n",i-2,i);
+        UDPLUO("%0*dB\n",i-2,i);
+        i+=50;
+    }
+}
 
 void udplog_init(int prio) {
     old_stdout_write=get_write_stdout();
@@ -94,4 +105,5 @@ void udplog_init(int prio) {
     
     xUDPlogSemaphore   = xSemaphoreCreateMutex();
     xTaskCreate(udplog_send, "logsend", 512, NULL, prio, NULL);
+    xTaskCreate(udplog_test, "logtest", 512, NULL, 1, NULL);
 }

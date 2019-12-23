@@ -9,8 +9,8 @@
 #include <time.h>
 #include <signal.h>
 
-#define SPORT  45678
-#define PPORT  44444
+#define SPORT  45677
+#define PPORT  45676
 #define MAXLINE 5000
 #define TO        29 //seconds
 
@@ -107,6 +107,7 @@ int main(int argc, char* argv[]) {
                 len = sizeof(peeraddr);
                 n = recvfrom(clntfd, (char *)buffer, MAXLINE, 0, ( struct sockaddr *) &peeraddr, &len);
                 for (i=0;i<n;i++) printf("%c", buffer[i]);
+                fflush(stdout);
             }
         }
     }

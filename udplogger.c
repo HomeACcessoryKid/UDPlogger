@@ -33,12 +33,12 @@ void udplog_send(void *pvParameters){
     udplogsClntAddr.sin_family = AF_INET;
     udplogsClntAddr.sin_len = sizeof(udplogsClntAddr);
     udplogsClntAddr.sin_addr.s_addr = htonl(INADDR_BROADCAST); // inet_addr("255.255.255.255");  or htonl(INADDR_BROADCAST);
-    udplogsClntAddr.sin_port =htons(45678);
+    udplogsClntAddr.sin_port =htons(45677);
     /*Source*/
     sLocalAddr.sin_family = AF_INET;
     sLocalAddr.sin_len = sizeof(sLocalAddr);
     sLocalAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    sLocalAddr.sin_port =htons(44444);
+    sLocalAddr.sin_port =htons(45676);
     lwip_bind(udploglSocket, (struct sockaddr *)&sLocalAddr, sizeof(sLocalAddr));
 
     lwip_sendto(udploglSocket, INIT, strlen(INIT), 0, (struct sockaddr *)&udplogsClntAddr, sizeof(udplogsClntAddr));

@@ -1,9 +1,10 @@
 /********************************
- * (c) 2018-2019 HomeAccessoryKid
+ * (c) 2018-2020 HomeAccessoryKid
  * UDP logger has 3 MACROs and 2 #defines
  * UDPLSO is like printf and does Serial Only
  * UDPLUO is like printf and does UDP Only to udp-client
  * UDPLUS is like printf and both udp-client and Serial will receive
+ * UDPLSU is the same as UDPLUS
  *
  * #define UDPLOG_PRINTF_TO_UDP      will modify the printf function to use UDP
  * #define UDPLOG_PRINTF_ALSO_SERIAL will modify the printf function to also use Serial
@@ -54,6 +55,7 @@
 #define UDPLUS(format, ...)  do {   UDPLSO(format,##__VA_ARGS__); \
                                     UDPLUO(format,##__VA_ARGS__); \
                                 } while(0)
+#define UDPLSU(format, ...)  UDPLUS(format,##__VA_ARGS__);
                                 
 #define INIT "UDPlog init message. Use udplog-client to receive other log messages\n"
 

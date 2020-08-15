@@ -1,4 +1,4 @@
-// (c) 2018-2019 HomeAccessoryKid
+// (c) 2018-2020 HomeAccessoryKid
 // see udplogger.h for instructions
 #include <stdio.h>
 #include <espressif/esp_wifi.h>
@@ -94,5 +94,5 @@ void udplog_init(int prio) {
     #endif  //ifdef UDPLOG_PRINTF_TO_UDP
     
     xUDPlogSemaphore   = xSemaphoreCreateMutex();
-    xTaskCreate(udplog_send, "logsend", 512, NULL, prio, NULL);
+    xTaskCreate(udplog_send, "udplog", 320, NULL, prio, NULL);
 }

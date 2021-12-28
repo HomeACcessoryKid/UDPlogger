@@ -3,7 +3,7 @@
 #include <stdio.h>
 #ifdef ESP_PLATFORM
  #include <esp_wifi.h>
-// #include <esp_sta.h> //TODO: get ESP-IDF equivalent
+ #include "esp_netif.h"
  #include <esp_system.h>
  #include "freertos/FreeRTOS.h"
  #include "freertos/task.h"
@@ -22,7 +22,7 @@
 
 SemaphoreHandle_t xUDPlogSemaphore = NULL;
 #ifdef ESP_PLATFORM
- #define UDPlogsendSTACKsize 1024
+ #define UDPlogsendSTACKsize 1536
  // redirect support
 #else
  #define UDPlogsendSTACKsize 320
@@ -38,8 +38,10 @@ void udplog_send(void *pvParameters){
     struct sockaddr_in sLocalAddr;
     char buffer[2];
 
-   #ifdef ESP_PLATFORM //TODO: get ESP-IDF equivalent
-    vTaskDelay(200);
+   #ifdef ESP_PLATFORM
+    esp_netif_ip_info_t info;
+    esp_netif_t* esp_netif=esp_netif_next(NULL);
+    while (!esp_netif_is_netif_up(esp_netif) || esp_netif_get_ip_info(esp_netif,&info)!=ESP_OK || info.ip.addr==0) vTaskDelay(20);
    #else
     while (sdk_wifi_station_get_connect_status() != STATION_GOT_IP) vTaskDelay(20); //Check if we have an IP every 200ms
    #endif

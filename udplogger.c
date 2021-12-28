@@ -1,19 +1,33 @@
-// (c) 2018-2020 HomeAccessoryKid
+// (c) 2018-2022 HomeAccessoryKid
 // see udplogger.h for instructions
 #include <stdio.h>
-#include <espressif/esp_wifi.h>
-#include <espressif/esp_sta.h>
-#include <espressif/esp_system.h>
-#include <esp8266.h>
-#include <FreeRTOS.h>
-#include <task.h>
+#ifdef ESP_PLATFORM
+ #include <esp_wifi.h>
+// #include <esp_sta.h> //TODO: get ESP-IDF equivalent
+ #include <esp_system.h>
+ #include "freertos/FreeRTOS.h"
+ #include "freertos/task.h"
+#else
+ #include <espressif/esp_wifi.h>
+ #include <espressif/esp_sta.h>
+ #include <espressif/esp_system.h>
+ #include <esp8266.h>
+ #include <FreeRTOS.h>
+ #include <task.h>
+#endif
 #include <string.h>
 #include <lwip/sockets.h>
 #include <lwip/raw.h>
 #include <udplogger.h>
 
 SemaphoreHandle_t xUDPlogSemaphore = NULL;
-_WriteFunction    *old_stdout_write;
+#ifdef ESP_PLATFORM
+ #define UDPlogsendSTACKsize 1024
+ // redirect support
+#else
+ #define UDPlogsendSTACKsize 320
+ _WriteFunction    *old_stdout_write;
+#endif
 char udplogstring[UDPLOGSTRING_SIZE]={0};
 int  udplogmembers=0,udploglSocket,udplogstring_len=0;
 struct sockaddr_in udplogsClntAddr;
@@ -24,7 +38,11 @@ void udplog_send(void *pvParameters){
     struct sockaddr_in sLocalAddr;
     char buffer[2];
 
+   #ifdef ESP_PLATFORM //TODO: get ESP-IDF equivalent
+    vTaskDelay(200);
+   #else
     while (sdk_wifi_station_get_connect_status() != STATION_GOT_IP) vTaskDelay(20); //Check if we have an IP every 200ms
+   #endif
 
     udploglSocket = lwip_socket(AF_INET, SOCK_DGRAM, 0);
     memset((char *)&sLocalAddr, 0, sizeof(sLocalAddr));
@@ -52,10 +70,17 @@ void udplog_send(void *pvParameters){
         if (FD_ISSET(udploglSocket, &rset)) {
             length = sizeof(udplogsClntAddr);
             n = recvfrom(udploglSocket, (char *)buffer, 2, 0, ( struct sockaddr *) &udplogsClntAddr, &length);
+           #ifdef ESP_PLATFORM //TODO: get ESP-IDF equivalent
+            udplogmembers=1; holdoff=0; timeout=29;
+           #else
             if (n==1) {udplogmembers=1; holdoff=0; timeout=(int)buffer[0];oldtime=sdk_system_get_time()/1000;}
+           #endif
         }
         if ((holdoff<=0 && udplogstring_len) || (holdoff<HOLDOFF && udplogstring_len>UDPLOGSTRING_SIZE*3/4)) {
+           #ifdef ESP_PLATFORM //TODO: get ESP-IDF equivalent
+           #else
             if ((sdk_system_get_time()/1000-oldtime)>timeout*1000) udplogmembers=0;
+           #endif
             if( xSemaphoreTake( xUDPlogSemaphore, ( TickType_t ) 1 ) == pdTRUE ) {
                 UDPLOGFLUSHNOFIT(UDPLOGSTRING_SIZE);
                 xSemaphoreGive( xUDPlogSemaphore );
@@ -70,9 +95,9 @@ void udplog_send(void *pvParameters){
 #ifdef  UDPLOG_PRINTF_TO_UDP
 #pragma message "UDPLOG_PRINTF_TO_UDP activated"
  static int new_stdout_write(struct _reent *r, int fd, const void *ptr, size_t len) {
-    #ifdef  UDPLOG_PRINTF_ALSO_SERIAL
-     old_stdout_write(NULL,0,ptr,len);
-    #endif  //ifdef UDPLOG_PRINTF_ALSO_SERIAL
+   #ifdef  UDPLOG_PRINTF_ALSO_SERIAL
+    old_stdout_write(NULL,0,ptr,len);
+   #endif  //ifdef UDPLOG_PRINTF_ALSO_SERIAL
     if (xSemaphoreTake( xUDPlogSemaphore, ( TickType_t ) 1 ) == pdTRUE) {
         UDPLOGFLUSHNOFIT(len);
         if (len>UDPLOGSTRING_SIZE) { //normally never used since printf only sends in chunks of 128 bytes at a time
@@ -88,11 +113,15 @@ void udplog_send(void *pvParameters){
 #endif  //ifdef UDPLOG_PRINTF_TO_UDP
 
 void udplog_init(int prio) {
+   #ifdef ESP_PLATFORM
+    // redirect support
+   #else
     old_stdout_write=get_write_stdout();
-    #ifdef  UDPLOG_PRINTF_TO_UDP
-     set_write_stdout(new_stdout_write);
-    #endif  //ifdef UDPLOG_PRINTF_TO_UDP
+   #endif
+   #ifdef  UDPLOG_PRINTF_TO_UDP
+    set_write_stdout(new_stdout_write);
+   #endif  //ifdef UDPLOG_PRINTF_TO_UDP
     
     xUDPlogSemaphore   = xSemaphoreCreateMutex();
-    xTaskCreate(udplog_send, "udplog", 320, NULL, prio, NULL);
+    xTaskCreate(udplog_send, "udplog", UDPlogsendSTACKsize, NULL, prio, NULL);
 }

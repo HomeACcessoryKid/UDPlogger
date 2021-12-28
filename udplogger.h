@@ -1,5 +1,5 @@
 /********************************
- * (c) 2018-2020 HomeAccessoryKid
+ * (c) 2018-2022 HomeAccessoryKid
  * UDP logger has 3 MACROs and 2 #defines
  * UDPLSO is like printf and does Serial Only
  * UDPLUO is like printf and does UDP Only to udp-client
@@ -15,8 +15,13 @@
 #ifndef __UDPLOGGER_H__
 #define __UDPLOGGER_H__
 
-#include <stdout_redirect.h>
-#include <semphr.h>
+#ifdef ESP_PLATFORM // this selects ESP-IDF or else esp-open-rtos is intended
+ // redirect support
+ #include <freertos/semphr.h>
+#else
+ #include <stdout_redirect.h>
+ #include <semphr.h>
+#endif
 #include <lwip/sockets.h>
 
 #ifndef UDPLOGSTRING_SIZE
@@ -61,7 +66,11 @@
 
 void udplog_init(int prio);
 extern SemaphoreHandle_t xUDPlogSemaphore;
-extern _WriteFunction    *old_stdout_write;
+#ifdef ESP_PLATFORM
+ // redirect support
+#else
+ extern _WriteFunction    *old_stdout_write;
+#endif
 extern char udplogstring[];
 extern int  udplogmembers,udploglSocket,udplogstring_len;
 extern struct sockaddr_in udplogsClntAddr;

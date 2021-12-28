@@ -22,7 +22,7 @@
 
 SemaphoreHandle_t xUDPlogSemaphore = NULL;
 #ifdef ESP_PLATFORM
- #define UDPlogsendSTACKsize 1536
+ #define UDPlogsendSTACKsize 2048
  // redirect support
 #else
  #define UDPlogsendSTACKsize 320
@@ -33,16 +33,18 @@ int  udplogmembers=0,udploglSocket,udplogstring_len=0;
 struct sockaddr_in udplogsClntAddr;
 
 void udplog_send(void *pvParameters){
-    int oldtime=0,timeout=1,n,holdoff=20*HOLDOFF; //should represent 2 seconds after trigger
+    int timeout=1,n,holdoff=20*HOLDOFF; //should represent 2 seconds after trigger
     unsigned int length;
     struct sockaddr_in sLocalAddr;
     char buffer[2];
 
    #ifdef ESP_PLATFORM
+    uint64_t oldtime=0;
     esp_netif_ip_info_t info;
     esp_netif_t* esp_netif=esp_netif_next(NULL);
     while (!esp_netif_is_netif_up(esp_netif) || esp_netif_get_ip_info(esp_netif,&info)!=ESP_OK || info.ip.addr==0) vTaskDelay(20);
    #else
+    uint32_t oldtime=0;
     while (sdk_wifi_station_get_connect_status() != STATION_GOT_IP) vTaskDelay(20); //Check if we have an IP every 200ms
    #endif
 
@@ -72,14 +74,18 @@ void udplog_send(void *pvParameters){
         if (FD_ISSET(udploglSocket, &rset)) {
             length = sizeof(udplogsClntAddr);
             n = recvfrom(udploglSocket, (char *)buffer, 2, 0, ( struct sockaddr *) &udplogsClntAddr, &length);
-           #ifdef ESP_PLATFORM //TODO: get ESP-IDF equivalent
-            udplogmembers=1; holdoff=0; timeout=29;
+            if (n==1) {
+                udplogmembers=1; holdoff=0; timeout=(int)buffer[0];
+           #ifdef ESP_PLATFORM
+                oldtime= esp_timer_get_time()/1000;
            #else
-            if (n==1) {udplogmembers=1; holdoff=0; timeout=(int)buffer[0];oldtime=sdk_system_get_time()/1000;}
+                oldtime=sdk_system_get_time()/1000;
            #endif
+            }
         }
         if ((holdoff<=0 && udplogstring_len) || (holdoff<HOLDOFF && udplogstring_len>UDPLOGSTRING_SIZE*3/4)) {
-           #ifdef ESP_PLATFORM //TODO: get ESP-IDF equivalent
+           #ifdef ESP_PLATFORM
+            if (( esp_timer_get_time()/1000-oldtime)>timeout*1000) udplogmembers=0;
            #else
             if ((sdk_system_get_time()/1000-oldtime)>timeout*1000) udplogmembers=0;
            #endif

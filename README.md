@@ -5,14 +5,25 @@ There is a client you can compile on macOS that will collect your logs.
 The key advantage is that it is simple, and it only sends outs logs if your client is looking for them.
 You can run multiple clients in parallel, each looking for a particular IP address source.
 
-(c) HomeAccessoryKid 2019
+(c) HomeAccessoryKid 2018-2022
 
-## Instructions
+## Instructions for esp-open-rtos
 - add to Makefile: EXTRA_COMPONENTS = $(abspath UDPlogger)
 - optional EXTRA_CFLAGS += -DUDPLOG_PRINTF_TO_UDP
 - optional EXTRA_CFLAGS += -DUDPLOG_PRINTF_ALSO_SERIAL
 - git submodule add https://github.com/HomeACcessoryKid/UDPlogger
 - in your .c files: #include <udplogger.h>
+
+## Instructions for ESP-IDF
+- install UDPlogger repo in components directory:  
+`cd components; git submodule add https://github.com/HomeACcessoryKid/UDPlogger`
+- add this to the CMakeLists.txt file to match your intentions with `printf`:  
+`set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUDPLOG_PRINTF_TO_UDP -DUDPLOG_PRINTF_ALSO_SERIAL")`
+- ToBeDone: add it to the menuconfig system
+- in your .c files: #include <udplogger.h>
+- Still issue with buffering and early start of udplog_init
+
+## Application to code
 ```
  * UDP logger has 3 MACROs and 2 #defines
  * UDPLSO is like printf and does Serial Only

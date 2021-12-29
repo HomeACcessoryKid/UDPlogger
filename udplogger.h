@@ -25,7 +25,7 @@
  #include <semphr.h>
  extern _WriteFunction *old_stdout_write;
  #define OLDWRITEFN(buff,len) old_stdout_write(NULL,0,buff,len)
-#endif
+#endif //ESP_PLATFORM
 #include <lwip/sockets.h>
 
 #ifndef UDPLOGSTRING_SIZE

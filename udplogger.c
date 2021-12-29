@@ -23,12 +23,14 @@
 SemaphoreHandle_t xUDPlogSemaphore = NULL;
 #ifdef ESP_PLATFORM
  #define UDPlogsendSTACKsize 2048
+ #define GETTIMEFN esp_timer_get_time
  FILE              *old_stdout;
  char stdout_buf[128];
 #else
  #define UDPlogsendSTACKsize 320
+ #define GETTIMEFN sdk_system_get_time
  _WriteFunction    *old_stdout_write;
-#endif
+#endif //ESP_PLATFORM
 char udplogstring[UDPLOGSTRING_SIZE]={0};
 int  udplogmembers=0,udploglSocket,udplogstring_len=0;
 struct sockaddr_in udplogsClntAddr;
@@ -47,7 +49,7 @@ void udplog_send(void *pvParameters){
    #else
     uint32_t oldtime=0;
     while (sdk_wifi_station_get_connect_status() != STATION_GOT_IP) vTaskDelay(20); //Check if we have an IP every 200ms
-   #endif
+   #endif //ESP_PLATFORM
 
     udploglSocket = lwip_socket(AF_INET, SOCK_DGRAM, 0);
     memset((char *)&sLocalAddr, 0, sizeof(sLocalAddr));
@@ -77,19 +79,11 @@ void udplog_send(void *pvParameters){
             n = recvfrom(udploglSocket, (char *)buffer, 2, 0, ( struct sockaddr *) &udplogsClntAddr, &length);
             if (n==1) {
                 udplogmembers=1; holdoff=0; timeout=(int)buffer[0];
-           #ifdef ESP_PLATFORM
-                oldtime= esp_timer_get_time()/1000;
-           #else
-                oldtime=sdk_system_get_time()/1000;
-           #endif
+                oldtime= GETTIMEFN()/1000;
             }
         }
         if ((holdoff<=0 && udplogstring_len) || (holdoff<HOLDOFF && udplogstring_len>UDPLOGSTRING_SIZE*3/4)) {
-           #ifdef ESP_PLATFORM
-            if (( esp_timer_get_time()/1000-oldtime)>timeout*1000) udplogmembers=0;
-           #else
-            if ((sdk_system_get_time()/1000-oldtime)>timeout*1000) udplogmembers=0;
-           #endif
+            if (( GETTIMEFN()/1000-oldtime)>timeout*1000) udplogmembers=0;
             if( xSemaphoreTake( xUDPlogSemaphore, ( TickType_t ) 1 ) == pdTRUE ) {
                 UDPLOGFLUSHNOFIT(UDPLOGSTRING_SIZE);
                 xSemaphoreGive( xUDPlogSemaphore );
@@ -102,7 +96,7 @@ void udplog_send(void *pvParameters){
 }
 
 #ifdef  UDPLOG_PRINTF_TO_UDP
-#pragma message "UDPLOG_PRINTF_TO_UDP activated"
+ #pragma message "UDPLOG_PRINTF_TO_UDP activated"
  #ifdef ESP_PLATFORM
   static int new_stdout_write(void* cookie, const char* ptr, int len) {
  #else
@@ -110,7 +104,7 @@ void udplog_send(void *pvParameters){
  #endif //ESP_PLATFORM
    #ifdef  UDPLOG_PRINTF_ALSO_SERIAL
     OLDWRITEFN(ptr,len);
-   #endif  //ifdef UDPLOG_PRINTF_ALSO_SERIAL
+   #endif  //UDPLOG_PRINTF_ALSO_SERIAL
     if (xSemaphoreTake( xUDPlogSemaphore, ( TickType_t ) 1 ) == pdTRUE) {
         UDPLOGFLUSHNOFIT(len);
         if (len>UDPLOGSTRING_SIZE) { //normally never used since printf only sends in chunks of 128 bytes at a time
@@ -122,8 +116,8 @@ void udplog_send(void *pvParameters){
         xSemaphoreGive( xUDPlogSemaphore );
     }
     return len;
- }
-#endif  //ifdef UDPLOG_PRINTF_TO_UDP
+  }
+#endif  //UDPLOG_PRINTF_TO_UDP
 
 void udplog_init(int prio) {
   #ifdef ESP_PLATFORM
@@ -136,8 +130,8 @@ void udplog_init(int prio) {
     old_stdout_write=get_write_stdout();
    #ifdef  UDPLOG_PRINTF_TO_UDP
     set_write_stdout(new_stdout_write);
-   #endif  //ifdef UDPLOG_PRINTF_TO_UDP
-  #endif
+   #endif  //UDPLOG_PRINTF_TO_UDP
+  #endif //ESP_PLATFORM
     
     xUDPlogSemaphore   = xSemaphoreCreateMutex();
     xTaskCreate(udplog_send, "udplog", UDPlogsendSTACKsize, NULL, prio, NULL);

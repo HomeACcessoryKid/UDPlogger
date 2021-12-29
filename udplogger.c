@@ -23,7 +23,8 @@
 SemaphoreHandle_t xUDPlogSemaphore = NULL;
 #ifdef ESP_PLATFORM
  #define UDPlogsendSTACKsize 2048
- // redirect support
+ FILE              *old_stdout;
+ char stdout_buf[128];
 #else
  #define UDPlogsendSTACKsize 320
  _WriteFunction    *old_stdout_write;
@@ -102,9 +103,13 @@ void udplog_send(void *pvParameters){
 
 #ifdef  UDPLOG_PRINTF_TO_UDP
 #pragma message "UDPLOG_PRINTF_TO_UDP activated"
- static int new_stdout_write(struct _reent *r, int fd, const void *ptr, size_t len) {
+ #ifdef ESP_PLATFORM
+  static int new_stdout_write(void* cookie, const char* ptr, int len) {
+ #else
+  static int new_stdout_write(struct _reent *r, int fd, const void *ptr, size_t len) {
+ #endif //ESP_PLATFORM
    #ifdef  UDPLOG_PRINTF_ALSO_SERIAL
-    old_stdout_write(NULL,0,ptr,len);
+    OLDWRITEFN(ptr,len);
    #endif  //ifdef UDPLOG_PRINTF_ALSO_SERIAL
     if (xSemaphoreTake( xUDPlogSemaphore, ( TickType_t ) 1 ) == pdTRUE) {
         UDPLOGFLUSHNOFIT(len);
@@ -121,14 +126,18 @@ void udplog_send(void *pvParameters){
 #endif  //ifdef UDPLOG_PRINTF_TO_UDP
 
 void udplog_init(int prio) {
-   #ifdef ESP_PLATFORM
-    // redirect support
-   #else
+  #ifdef ESP_PLATFORM
+    old_stdout=_GLOBAL_REENT->_stdout;
+   #ifdef  UDPLOG_PRINTF_TO_UDP
+    _GLOBAL_REENT->_stdout=fwopen(NULL, &new_stdout_write);
+    setvbuf(stdout, stdout_buf, _IOLBF, sizeof(stdout_buf)); // enable line buffering for this stream (to be similar to the regular UART-based output)
+   #endif  //UDPLOG_PRINTF_TO_UDP
+  #else
     old_stdout_write=get_write_stdout();
-   #endif
    #ifdef  UDPLOG_PRINTF_TO_UDP
     set_write_stdout(new_stdout_write);
    #endif  //ifdef UDPLOG_PRINTF_TO_UDP
+  #endif
     
     xUDPlogSemaphore   = xSemaphoreCreateMutex();
     xTaskCreate(udplog_send, "udplog", UDPlogsendSTACKsize, NULL, prio, NULL);

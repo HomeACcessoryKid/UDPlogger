@@ -16,11 +16,15 @@
 #define __UDPLOGGER_H__
 
 #ifdef ESP_PLATFORM // this selects ESP-IDF or else esp-open-rtos is intended
- // redirect support
+ #include <stdio.h>
  #include <freertos/semphr.h>
+ extern FILE           *old_stdout;
+ #define OLDWRITEFN(buff,len) fwrite(buff,len,sizeof(char),old_stdout)
 #else
  #include <stdout_redirect.h>
  #include <semphr.h>
+ extern _WriteFunction *old_stdout_write;
+ #define OLDWRITEFN(buff,len) old_stdout_write(NULL,0,buff,len)
 #endif
 #include <lwip/sockets.h>
 
@@ -54,7 +58,7 @@
 #define UDPLSO(format, ...)  do {{  char *udplogsostring; size_t udplogsosize; \
                                     udplogsostring=malloc(udplogsosize=1+snprintf(NULL,0,format,##__VA_ARGS__)); \
                                     snprintf(udplogsostring,udplogsosize,format,##__VA_ARGS__); \
-                                    old_stdout_write(NULL,0,udplogsostring,udplogsosize); \
+                                    OLDWRITEFN(udplogsostring,udplogsosize); \
                                     free(udplogsostring); \
                                 }}while(0)
 #define UDPLUS(format, ...)  do {   UDPLSO(format,##__VA_ARGS__); \
@@ -66,11 +70,6 @@
 
 void udplog_init(int prio);
 extern SemaphoreHandle_t xUDPlogSemaphore;
-#ifdef ESP_PLATFORM
- // redirect support
-#else
- extern _WriteFunction    *old_stdout_write;
-#endif
 extern char udplogstring[];
 extern int  udplogmembers,udploglSocket,udplogstring_len;
 extern struct sockaddr_in udplogsClntAddr;

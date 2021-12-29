@@ -41,8 +41,8 @@ void udplog_send(void *pvParameters){
    #ifdef ESP_PLATFORM
     uint64_t oldtime=0;
     esp_netif_ip_info_t info;
-    esp_netif_t* esp_netif=esp_netif_next(NULL);
-    while (!esp_netif_is_netif_up(esp_netif) || esp_netif_get_ip_info(esp_netif,&info)!=ESP_OK || info.ip.addr==0) vTaskDelay(20);
+    esp_netif_t* esp_netif;
+    while ((esp_netif=esp_netif_next(NULL))==NULL || !esp_netif_is_netif_up(esp_netif) || esp_netif_get_ip_info(esp_netif,&info)!=ESP_OK || info.ip.addr==0) vTaskDelay(20);
    #else
     uint32_t oldtime=0;
     while (sdk_wifi_station_get_connect_status() != STATION_GOT_IP) vTaskDelay(20); //Check if we have an IP every 200ms

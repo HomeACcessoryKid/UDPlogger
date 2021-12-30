@@ -46,7 +46,7 @@
                                         if (len>UDPLOGSTRING_SIZE) { \
                                             char *udploguostring; \
                                             snprintf(udploguostring=malloc(len),len,format,##__VA_ARGS__); \
-                                            if (udplogmembers) lwip_sendto(udploglSocket, udploguostring, len, 0, \
+                                            if (udplogmembers) lwip_sendto(udploglSocket, udploguostring, len-1, 0, \
                                                                 (struct sockaddr *)&udplogsClntAddr,sizeof(udplogsClntAddr));\
                                             free(udploguostring); \
                                         } else { \
@@ -58,7 +58,7 @@
 #define UDPLSO(format, ...)  do {{  char *udplogsostring; size_t udplogsosize; \
                                     udplogsostring=malloc(udplogsosize=1+snprintf(NULL,0,format,##__VA_ARGS__)); \
                                     snprintf(udplogsostring,udplogsosize,format,##__VA_ARGS__); \
-                                    OLDWRITEFN(udplogsostring,udplogsosize); \
+                                    OLDWRITEFN(udplogsostring,udplogsosize-1); \
                                     free(udplogsostring); \
                                 }}while(0)
 #define UDPLUS(format, ...)  do {   UDPLSO(format,##__VA_ARGS__); \

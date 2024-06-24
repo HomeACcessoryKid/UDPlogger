@@ -7,6 +7,7 @@
  #include <esp_system.h>
  #include "freertos/FreeRTOS.h"
  #include "freertos/task.h"
+ #include "esp_timer.h"
 #else
  #include <espressif/esp_wifi.h>
  #include <espressif/esp_sta.h>

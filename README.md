@@ -1,11 +1,11 @@
 # UDPlogger
-a light way to get the logs out of your ESP8266
+a light way to get the logs out of your ESP8266 and ESP32
 
 There is a client you can compile on macOS that will collect your logs.
 The key advantage is that it is simple, and it only sends outs logs if your client is looking for them.
 You can run multiple clients in parallel, each looking for a particular IP address source.
 
-(c) HomeAccessoryKid 2018-2022
+(c) HomeAccessoryKid 2018-2024
 
 ## Instructions for esp-open-rtos
 - add to Makefile: EXTRA_COMPONENTS = $(abspath UDPlogger)
@@ -17,11 +17,13 @@ You can run multiple clients in parallel, each looking for a particular IP addre
 ## Instructions for ESP-IDF
 - install UDPlogger repo in components directory:  
 `cd components; git submodule add https://github.com/HomeACcessoryKid/UDPlogger`
-- add this to the CMakeLists.txt file to match your intentions with `printf`:  
+- add `PRIV_REQUIRES UDPlogger` to the main CMakeLists.txt
+- add this to the root CMakeLists.txt file to match your intentions with `printf` (before include...) :  
 `set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DUDPLOG_PRINTF_TO_UDP -DUDPLOG_PRINTF_ALSO_SERIAL")`
 - ToBeDone: add it to the menuconfig system
 - in your .c files: #include <udplogger.h>
 - Still issue with buffering and early start of udplog_init
+- in idf 5.3 the printf for ESP32 seems broken
 
 ## Application to code
 ```

@@ -38,7 +38,7 @@ struct sockaddr_in udplogsClntAddr;
 
 void udplog_send(void *pvParameters){
     int timeout=1,n,holdoff=20*HOLDOFF; //should represent 2 seconds after trigger
-    unsigned int length;
+    long unsigned int length;
     struct sockaddr_in sLocalAddr;
     char buffer[2];
 
@@ -46,7 +46,7 @@ void udplog_send(void *pvParameters){
     uint64_t oldtime=0;
     esp_netif_ip_info_t info;
     esp_netif_t* esp_netif;
-    while ((esp_netif=esp_netif_next(NULL))==NULL || !esp_netif_is_netif_up(esp_netif) || esp_netif_get_ip_info(esp_netif,&info)!=ESP_OK || info.ip.addr==0) vTaskDelay(20);
+    while ((esp_netif=esp_netif_next_unsafe(NULL))==NULL || !esp_netif_is_netif_up(esp_netif) || esp_netif_get_ip_info(esp_netif,&info)!=ESP_OK || info.ip.addr==0) vTaskDelay(20);
    #else
     uint32_t oldtime=0;
     while (sdk_wifi_station_get_connect_status() != STATION_GOT_IP) vTaskDelay(20); //Check if we have an IP every 200ms
